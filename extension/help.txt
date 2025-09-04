@@ -1,0 +1,17 @@
+----------manifest.json
+service worker assigns the background.js script , service workers are event driven scripts that run in the background seperate from web pages, handle events like alarms messages or network requests
+type module - indicates that this service worker script should be treated as an ECMAScript module allowing you to use mordern js features such as import and export statements within the script
+
+runat-documetidle: run at specifies when the content script will be injected into the web pages that are corresponding to this, document idle means the script will run after the page has finished loading and the browser is idl as before window.onload event fires, this is useful it ensures that most of the pages html and resources are loaded
+
+permisions - "storage": Lets your extension save and retrieve data using Chrome’s chrome.storage API, useful for storing settings or user data.
+"tabs": Allows your extension to interact with browser tabs—query, update, create, or remove them, and access tab information.
+"scripting": Enables your extension to inject JavaScript or CSS into web pages programmatically using the chrome.scripting API.
+"activeTab": Temporarily grants your extension access to the currently active tab when the user interacts with the extension (e.g., clicks the extension icon).
+"notifications": Lets your extension display desktop notifications to the user using the chrome.notifications API.44
+
+
+// "background": {
+  //   "service_worker": "background.js",
+  //   "type": "module"
+  // } add this back to the manifest

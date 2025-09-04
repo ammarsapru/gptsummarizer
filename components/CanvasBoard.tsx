@@ -8,147 +8,34 @@ import {
   useRef,
   useCallback,
   useEffect,
-  forwardRef,
   useMemo,
+  forwardRef,
 } from "react";
 import { Minus, Plus } from "lucide-react";
-import Card from "./card";
 import { supabase } from "@/utils/supabase/client";
+import ArrowConnector from "./canvas/ArrowConnector";
+import DraggableElement from "./canvas/DraggableElement";
+import { computeBounds } from "../app/lib/layout";
+import { getArrowEndpoint } from "../app/lib/geometry";
+import type { ChatPair, DraggableElementData } from "../app/types/canvas";
+// If your Card lives in app/card.tsx:
+import Card from "../app/card"; // or move Card to components and import from "./Card"
+
+// import Card from "@/app/card";
+// import ArrowConnector from "@/components/canvas/ArrowConnector";
+// import DraggableElement from "@/components/canvas/DraggableElement";
+// import { computeBounds } from "@/lib/layout";
+// import { getArrowEndpoint } from "@/lib/geometry";
+// import type { ChatPair, DraggableElementData } from "@/types/canvas";
 
 /* =========================================================
-   Types
+   Component: CanvasBoard
    ========================================================= */
-interface ChatPair {
-  user: string;
-  assistant: string;
-}
+export default function CanvasBoard() {
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-interface DraggableElementData {
-  id: string;
-  pos?: { x: number; y: number }; // WORLD coordinates
-  size?: { width: number; height: number };
-  user: string;
-  assistant: string;
-  generating?: boolean;
-}
-
-/* =========================================================
-   SVG: Arrow connector (RENDER coordinates)
-   ========================================================= */
-const ArrowConnector = ({ start, end, color = "#4b5563" }) => {
-  if (!start || !end) return null;
-  return (
-    <line
-      x1={start.x}
-      y1={start.y}
-      x2={end.x}
-      y2={end.y}
-      stroke={color}
-      strokeWidth="2"
-      vectorEffect="non-scaling-stroke"
-      markerEnd="url(#arrowhead)"
-    />
-  );
-};
-
-/* =========================================================
-   Draggable wrapper (receives RENDER-space pos/size)
-   ========================================================= */
-const DraggableElement = forwardRef(
-  (
-    {
-      id,
-      pos, // {x,y} already in RENDER space (world + renderOffset)
-      size,
-      onDragStart,
-      onResizeStart,
-      children,
-    }: any,
-    ref: any
-  ) => {
-    const handleMouseDown = useCallback(
-      (e: MouseEvent | any) => {
-        if (e.button !== 0) return; // left click only
-        e.stopPropagation();
-        e.preventDefault();
-        onDragStart(e, id);
-      },
-      [id, onDragStart]
-    );
-
-    const handleResizeMouseDown = useCallback(
-      (e: MouseEvent | any, direction: string) => {
-        if (e.button !== 0) return;
-        e.stopPropagation();
-        e.preventDefault();
-        onResizeStart(e, id, direction);
-      },
-      [id, onResizeStart]
-    );
-
-    return (
-      <div
-        ref={ref}
-        id={id}
-        data-element-id={id}
-        className="absolute select-none cursor-grab"
-        style={{
-          // GPU-friendly movement (no layout thrash)
-          transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,
-          width: size.width,
-          height: size.height,
-          willChange: "transform",
-        }}
-        onMouseDown={handleMouseDown as any}
-      >
-        <div className="w-full h-full relative">
-          {children}
-          <div
-            onMouseDown={(e) => handleResizeMouseDown(e, "bottom right")}
-            className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 rounded-full cursor-se-resize hover:bg-blue-700"
-            title="Resize"
-          />
-        </div>
-      </div>
-    );
-  }
-);
-
-/* =========================================================
-   Utilities
-   ========================================================= */
-function computeBounds(
-  elements: DraggableElementData[],
-  containerW: number,
-  containerH: number
-) {
-  let minX = Infinity,
-    minY = Infinity,
-    maxRight = -Infinity,
-    maxBottom = -Infinity;
-
-  for (const el of elements) {
-    if (!el?.pos || !el?.size) continue;
-    minX = Math.min(minX, el.pos.x);
-    minY = Math.min(minY, el.pos.y);
-    maxRight = Math.max(maxRight, el.pos.x + el.size.width);
-    maxBottom = Math.max(maxBottom, el.pos.y + el.size.height);
-  }
-
-  if (minX === Infinity) {
-    minX = 0;
-    minY = 0;
-    maxRight = containerW;
-    maxBottom = containerH;
-  }
-  return { minX, minY, maxRight, maxBottom };
-}
-
-/* =========================================================
-   Component: Home
-   ========================================================= */
-export default function Home() {
-  const mockChatPairs = [
+  // Mock data (optional)
+  const mockChatPairs: ChatPair[] = [
     {
       user: "What is the capital of France?",
       assistant:
@@ -165,7 +52,7 @@ export default function Home() {
         "Beyond the glamour, Paris retains an intimate charm in its quiet neighborhoods, hidden courtyards, and centuries-old markets. " +
         "It is a city that invites both grandeur and simplicity, offering moments of breathtaking beauty whether you are standing atop the Arc de Triomphe " +
         "or simply sipping coffee at a small café terrace, watching the world go by. " +
-        "For millions who visit or call it home, Paris represents not just a destination, but a timeless symbol of romance, artistry, and the enduring human spirit."
+        "For millions who visit or call it home, Paris represents not just a destination, but a timeless symbol of romance, artistry, and the enduring human spirit.",
     },
     {
       user: "Explain quantum entanglement in simple terms.",
@@ -174,7 +61,7 @@ export default function Home() {
         "that the state of one instantly affects the state of the other, even if they are light-years apart. " +
         "This is not just a weird coincidence — it’s a fundamental property of quantum mechanics. " +
         "Scientists describe it as the particles sharing a single combined state, " +
-        "meaning their properties are correlated in a way that defies classical explanations."
+        "meaning their properties are correlated in a way that defies classical explanations.",
     },
     {
       user: "Give me tips for improving public speaking.",
@@ -186,8 +73,8 @@ export default function Home() {
         "Use pauses strategically to emphasize points. " +
         "Maintain eye contact, engage with your audience through questions or relatable examples, " +
         "and manage nervous energy with breathing exercises. " +
-        "Finally, record yourself to spot areas for improvement and track your progress over time."
-    }
+        "Finally, record yourself to spot areas for improvement and track your progress over time.",
+    },
   ];
 
   const useMock = true;
@@ -205,12 +92,8 @@ export default function Home() {
   const [isPanning, setIsPanning] = useState(false);
 
   // Interaction
-  const [draggingElementId, setDraggingElementId] = useState<string | null>(
-    null
-  );
-  const [resizingElementId, setResizingElementId] = useState<string | null>(
-    null
-  );
+  const [draggingElementId, setDraggingElementId] = useState<string | null>(null);
+  const [resizingElementId, setResizingElementId] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
   // Refs
@@ -238,6 +121,7 @@ export default function Home() {
       setChatPairs(mockChatPairs);
       return;
     }
+
     const fetchInitialData = async () => {
       const { data, error } = await supabase.from("chat-pairs").select("*");
       if (error) {
@@ -308,15 +192,12 @@ export default function Home() {
 
   /* =========================================================
      BLOCK browser page zoom globally
-     (This is why sidebar won't “zoom” anymore.)
      ========================================================= */
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
-      // Browser zoom gesture (Ctrl/Cmd + wheel) → block everywhere
       if (e.ctrlKey || e.metaKey) e.preventDefault();
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      // Block Ctrl/Cmd + (+ / - / 0) page zoom/reset
       const isZoomKey =
         e.code === "Equal" ||
         e.code === "NumpadAdd" ||
@@ -325,7 +206,7 @@ export default function Home() {
         e.code === "Digit0";
       if ((e.ctrlKey || e.metaKey) && isZoomKey) e.preventDefault();
     };
-    const prevent = (ev: Event) => ev.preventDefault(); // Safari pinch gestures
+    const prevent = (ev: Event) => ev.preventDefault();
 
     window.addEventListener("wheel", onWheel, { passive: false });
     window.addEventListener("keydown", onKeyDown as any, { passive: false });
@@ -397,7 +278,6 @@ export default function Home() {
      ========================================================= */
   const screenToWorld = useCallback(
     (sx: number, sy: number) => {
-      // Inverse of: screen = panOffset + scale * (world + renderOffset)
       const inv = 1 / scale;
       const renderX = (sx - panOffset.x) * inv;
       const renderY = (sy - panOffset.y) * inv;
@@ -409,7 +289,7 @@ export default function Home() {
   const worldViewport = useMemo(() => {
     const tl = screenToWorld(0, 0);
     const br = screenToWorld(containerDimensions.width, containerDimensions.height);
-    const BUFFER = 200; // pre-render neighbors for smoothness
+    const BUFFER = 200;
     return {
       left: Math.min(tl.x, br.x) - BUFFER,
       top: Math.min(tl.y, br.y) - BUFFER,
@@ -417,83 +297,6 @@ export default function Home() {
       bottom: Math.max(tl.y, br.y) + BUFFER,
     };
   }, [screenToWorld, containerDimensions.width, containerDimensions.height]);
-
-  /* =========================================================
-     Arrow endpoints (WORLD)
-     ========================================================= */
-  const getCardEdgePoint = useCallback((cardBounds: any, otherPoint: any) => {
-    if (!cardBounds || !otherPoint) return null;
-
-    const { left, top, right, bottom, center } = cardBounds;
-    const dx = otherPoint.x - center.x;
-    const dy = otherPoint.y - center.y;
-    const epsilon = 1e-6;
-    const pts: { x: number; y: number }[] = [];
-
-    if (Math.abs(dy) > epsilon) {
-      const x_top = center.x + (dx / dy) * (top - center.y);
-      if (x_top >= left - epsilon && x_top <= right + epsilon) pts.push({ x: x_top, y: top });
-      const x_bottom = center.x + (dx / dy) * (bottom - center.y);
-      if (x_bottom >= left - epsilon && x_bottom <= right + epsilon) pts.push({ x: x_bottom, y: bottom });
-    }
-    if (Math.abs(dx) > epsilon) {
-      const y_left = center.y + (dy / dx) * (left - center.x);
-      if (y_left >= top - epsilon && y_left <= bottom + epsilon) pts.push({ x: left, y: y_left });
-      const y_right = center.y + (dy / dx) * (right - center.x);
-      if (y_right >= top - epsilon && y_right <= bottom + epsilon) pts.push({ x: right, y: y_right });
-    }
-
-    if (Math.abs(dx) < epsilon) {
-      if (dy > 0) pts.push({ x: center.x, y: bottom });
-      else if (dy < 0) pts.push({ x: center.x, y: top });
-    }
-    if (Math.abs(dy) < epsilon) {
-      if (dx > 0) pts.push({ x: right, y: center.y });
-      else if (dx < 0) pts.push({ x: left, y: center.y });
-    }
-
-    if (!pts.length) return null;
-
-    const closest = pts.reduce((best: any, cur) => {
-      const dCur = Math.hypot(cur.x - otherPoint.x, cur.y - otherPoint.y);
-      const dBest = best ? Math.hypot(best.x - otherPoint.x, best.y - otherPoint.y) : Infinity;
-      return dCur < dBest ? cur : best;
-    }, null as any);
-
-    return closest;
-  }, []);
-
-  const getElementBounds = useCallback(
-    (id: string) => {
-      const el = elements.find((n) => n.id === id);
-      if (!el || !el.pos || !el.size) return null;
-      const { x, y } = el.pos;
-      const { width, height } = el.size;
-      return {
-        left: x,
-        top: y,
-        right: x + width,
-        bottom: y + height,
-        width,
-        height,
-        center: { x: x + width / 2, y: y + height / 2 },
-      };
-    },
-    [elements]
-  );
-
-  const getArrowEndpoint = useCallback(
-    (startId: string, endId: string) => {
-      const a = getElementBounds(startId);
-      const b = getElementBounds(endId);
-      if (!a || !b) return null;
-      return {
-        start: getCardEdgePoint(a, b.center),
-        end: getCardEdgePoint(b, a.center),
-      };
-    },
-    [getElementBounds, getCardEdgePoint]
-  );
 
   /* =========================================================
      Interaction: connect / zoom / pan / drag / resize
@@ -519,7 +322,6 @@ export default function Home() {
     [selectedCardId, connections]
   );
 
-  // Zoom anchored at a screen point (only used in CANVAS handler / buttons)
   const zoomAtPoint = useCallback(
     (newScale: number, screenX: number, screenY: number) => {
       const clamped = Math.max(0.1, Math.min(3, newScale));
@@ -538,7 +340,6 @@ export default function Home() {
     [scale, panOffset.x, panOffset.y]
   );
 
-  // Zoom buttons act at canvas center
   const zoomAtCenter = useCallback(
     (delta: number) => {
       const cx = containerDimensions.width / 2;
@@ -548,12 +349,10 @@ export default function Home() {
     [zoomAtPoint, containerDimensions.width, containerDimensions.height, scale]
   );
 
-  // CANVAS WHEEL: Ctrl/Cmd+wheel => zoom; else: pan vertically/horizontally
   const handleWheel = useCallback(
     (e: WheelEvent | any) => {
       e.preventDefault();
 
-      // Zoom only when Ctrl/Cmd is held (we blocked browser zoom globally)
       if (e.ctrlKey || e.metaKey) {
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
@@ -564,7 +363,6 @@ export default function Home() {
         return;
       }
 
-      // Normal wheel = pan the canvas
       setPanOffset((prev) => ({
         x: prev.x - e.deltaX,
         y: prev.y - e.deltaY,
@@ -652,7 +450,7 @@ export default function Home() {
 
   const handleDragStart = useCallback(
     (e: MouseEvent | any, id: string) => {
-      if (e.button !== 0) return; // left click only
+      if (e.button !== 0) return;
       const element = elements.find((el) => el.id === id);
       if (!element || !element.pos) return;
       setDraggingElementId(id);
@@ -661,16 +459,83 @@ export default function Home() {
     [elements]
   );
 
+  const centerOnWorldPoint = useCallback(
+    (wx: number, wy: number) => {
+      setPanOffset({
+        x: containerDimensions.width / 2 - scale * (wx + renderOffset.x),
+        y: containerDimensions.height / 2 - scale * (wy + renderOffset.y),
+      });
+    },
+    [containerDimensions.width, containerDimensions.height, scale, renderOffset.x, renderOffset.y]
+  );
+
+  const screenCenterToNearestCard = useCallback(() => {
+    if (!elements.length) return;
+
+    const vpCenter = screenToWorld(
+      containerDimensions.width / 2,
+      containerDimensions.height / 2
+    );
+
+    let best = { id: "", d2: Number.POSITIVE_INFINITY, cx: 0, cy: 0 };
+    for (const el of elements) {
+      if (!el.pos || !el.size) continue;
+      const cx = el.pos.x + el.size.width / 2;
+      const cy = el.pos.y + el.size.height / 2;
+      const dx = cx - vpCenter.x;
+      const dy = cy - vpCenter.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < best.d2) best = { id: el.id, d2, cx, cy };
+    }
+    if (best.id) centerOnWorldPoint(best.cx, best.cy);
+  }, [elements, screenToWorld, containerDimensions.width, containerDimensions.height, centerOnWorldPoint]);
+
+  const loadSession = useCallback(async (sessionId: string) => {
+    setActiveSessionId(sessionId);
+    const { data, error } = await supabase
+      .from("chat_pairs")
+      .select("*")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error loading chat_pairs:", error);
+      return;
+    }
+
+    const rows = data || [];
+    const nextElements = rows.map((row: any, index: number) => {
+      const gridX = index % 3;
+      const gridY = Math.floor(index / 3);
+      return {
+        id: `card-${row.id}`,
+        pos: { x: 50 + gridX * 350, y: 50 + gridY * 250 },
+        size: { width: 300, height: 200 },
+        user: row.user,
+        assistant: row.assistant,
+      };
+    });
+
+    setElements(nextElements);
+
+    if (nextElements.length) {
+      const first = nextElements[0];
+      const cx = first.pos.x + first.size.width / 2;
+      const cy = first.pos.y + first.size.height / 2;
+      centerOnWorldPoint(cx, cy);
+    }
+  }, [centerOnWorldPoint]);
+
   /* =========================================================
      Render
      ========================================================= */
   return (
     <div className="flex min-h-screen w-full h-full">
-      {/* ---------- Sidebar (never zooms; normal vertical scrolling) ---------- */}
+      {/* Sidebar */}
       <div
         ref={sidebarRef}
         className="flex flex-col items-center justify-center w-1/12 h-full bg-black p-2 z-30"
-        style={{ touchAction: "pan-y" }} // allow natural vertical scroll, block pinch
+        style={{ touchAction: "pan-y" }}
       >
         <div className="bg-white rounded-lg shadow-lg p-4 w-full flex flex-col items-center gap-2">
           <h1 className="text-sm text-center">Sidebar</h1>
@@ -696,14 +561,22 @@ export default function Home() {
           >
             <Plus size={14} />
           </button>
+
+          <button
+            onClick={screenCenterToNearestCard}
+            className="p-1 bg-gray-200 rounded hover:bg-gray-300 w-full mt-1"
+            title="Re-center to nearest card"
+          >
+            Center
+          </button>
         </div>
       </div>
 
-      {/* ---------- Canvas area (all pan/zoom restricted here) ---------- */}
+      {/* Canvas area */}
       <div
         ref={containerRef}
         className="flex-1 bg-white p-4 relative overflow-hidden z-0"
-        style={{ touchAction: "none" }} // we own gestures here
+        style={{ touchAction: "none" }}
         onWheel={handleWheel as any}
         onMouseDown={handleCanvasMouseDown as any}
         onMouseMove={handleContainerMouseMove as any}
@@ -743,7 +616,7 @@ export default function Home() {
               </marker>
             </defs>
             {connections.map((conn, index) => {
-              const endpoints = getArrowEndpoint(conn.from, conn.to);
+              const endpoints = getArrowEndpoint(elements, conn.from, conn.to);
               if (!endpoints) return null;
               const start = {
                 x: endpoints.start.x + renderOffset.x,
@@ -757,7 +630,7 @@ export default function Home() {
             })}
           </svg>
 
-          {/* Nodes (cull in WORLD space) */}
+          {/* Nodes */}
           {elements.map((el) => {
             if (!el.pos || !el.size) return null;
 
@@ -800,7 +673,7 @@ export default function Home() {
                   id={el.id}
                   user={el.user}
                   assistant={el.assistant}
-                  onConnect={handleConnectClick}
+                  onConnect={(id) => handleConnectClick(id)}
                   isSelected={selectedCardId === el.id}
                 />
               </DraggableElement>

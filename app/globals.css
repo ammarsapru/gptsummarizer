@@ -1,15 +1,17 @@
+/* globals.css */
+
 @import "tailwindcss";
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,4 +25,56 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@font-face {
+  font-family: 'Disperce';
+  src: url('/fonts/Dispence-odxz.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+.font-disperce {
+  font-family: 'Disperce', sans-serif;
+}
+
+@font-face {
+  font-family: 'Qanielo';
+  src: url('/fonts/Qanielo-5y5qV.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-qanielo {
+  font-family: 'Qanielo', sans-serif;
+}
+
+@font-face {
+  font-family: 'Condense';
+  src: url('/fonts/CondensoDemoRegular-DYK2R.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  letter-spacing: 2rem;            /* try small positive values, e.g. 0.005–0.02em */
+  /* enable kerning + ligatures */
+  font-kerning: normal;
+  font-feature-settings: "tnum";
+  /* rendering hint (not standard but helpful) */
+  text-rendering: optimizeLegibility;
+}
+
+.font-condense {
+  font-family: 'Condense', sans-serif;
+}
+
+@font-face {
+  font-family: 'Field-mono';
+  src: url('/fonts/Fieldmono-6R7Xg.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-field-mono {
+  font-family: 'Field-mono', monospace;
 }
